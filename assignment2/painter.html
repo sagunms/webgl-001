@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
+    <title>Assignment 2: Painting with the Mouse</title>
+
+    <script id="vertex-shader" type="x-shader/x-vertex">
+        attribute vec4 vPosition;
+
+        void main() {
+            gl_Position = vPosition;
+        }
+    </script>
+
+    <script id="fragment-shader" type="x-shader/x-fragment">
+        precision mediump float;
+        uniform vec4 fColor;
+
+        void main() {
+            gl_FragColor = fColor;
+        }
+    </script>
+
+    <script type="text/javascript" src="../Common/webgl-utils.js"></script>
+    <script type="text/javascript" src="../Common/initShaders.js"></script>
+    <script type="text/javascript" src="../Common/MV.js"></script>
+</head>
+
+<body>
+    <canvas id="gl-canvas" width="600" height="600"></canvas>
+
+    <form>
+        <label>Colour:&nbsp;</label>
+        <select id="color">
+            <option value="0" selected="selected">Black</option>
+            <option value="1">Red</option>
+            <option value="2">Yellow</option>
+            <option value="3">Green</option>
+            <option value="4">Blue</option>
+            <option value="5">Magenta</option>
+            <option value="6">Cyan</option>
+        </select>
+    </form>
+
+    <script type="text/javascript" src="painter.js"></script>
+</body>
+</html>
