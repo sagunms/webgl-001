@@ -4,7 +4,8 @@ var gl;
 var program;
 
 var canvas = document.getElementById("gl-canvas");
-var controlColor = document.getElementById("color");
+var selectColour = document.getElementById("colour");
+var btnClear = document.getElementById("btnClear")
 
 var prevPoint;
 var colourPos;
@@ -24,6 +25,12 @@ function coordinate(x, y) {
                 -1 + 2 * (canvas.height - y) / canvas.height    ];
 }
 
+function clear() {
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clearColor(0.65, 0.65, 0.65, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+}
+
 canvas.addEventListener("mousedown", function(event) {
     if (event.buttons === 1) {
         prevPoint = coordinate(event.clientX, event.clientY);
@@ -39,8 +46,12 @@ canvas.addEventListener("mousemove", function(event) {
     };
 });
 
-controlColor.onchange = function(e) {
-    gl.uniform4fv(colourPos, flatten(colours[controlColor.selectedIndex]));
+selectColour.onchange = function(e) {
+    gl.uniform4fv(colourPos, flatten(colours[selectColour.selectedIndex]));
+};
+
+btnClear.onclick = function(e) {
+    clear();
 };
 
 window.onload = function() {
@@ -53,9 +64,7 @@ window.onload = function() {
     gl.useProgram(program);
 
     // Configure WebGL
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.clearColor(0.5, 0.5, 0.5, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    clear();
 
     // Load the data into the GPU
     var bufferId = gl.createBuffer();
@@ -68,5 +77,5 @@ window.onload = function() {
 
     // Uniform to hold color information
     colourPos = gl.getUniformLocation(program, "fColor");
-    gl.uniform4fv(colourPos, flatten(colours[controlColor.selectedIndex]));
+    gl.uniform4fv(colourPos, flatten(colours[selectColour.selectedIndex]));
 };
