@@ -1,3 +1,3 @@
-# WebGL Geometric CAD
+# WebGL Lighting
 ## Demo URL
-http://rawgit.com/sagunms/webgl-001/master/assignment3/geometriccad.html
+http://rawgit.com/sagunms/webgl-001/master/assignment4/lighting.html
