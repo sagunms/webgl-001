@@ -1,68 +1,73 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
 <head>
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
-    <title>Assignment 3: Geometric CAD</title>
-    <h2>WebGL Geometric CAD</h2>
-    <style>
-        .object-item {
-            cursor: pointer;
-        }
-        .active {
-            font-weight: bold;
-        }
-        li {
-            display: list-item;
-        }
-    </style>
-    
+    <title>Assignment 4: Lighting</title>
+    <h2>Assignment 4: WebGL Lighting</h2>
+
+    <!-- Vertex Shader -->
     <script id="vertex-shader" type="x-shader/x-vertex">
         attribute vec4 vPosition;
-        attribute vec4 vColor;
-        varying vec4 fColor;
+        attribute vec3 vNormal;
+        varying vec3 N, L[2], E;
+        varying float d[2];
+        uniform mat4 mvMatrix;
+        uniform mat4 prMatrix;
+        uniform vec4 lightPosition[2];
 
-        uniform vec3 tf;
-        uniform vec3 sf;
-        uniform vec3 theta;
+        void main() 
+        {
+            vec3 pos = (mvMatrix * vPosition).xyz;
+            E = normalize(-pos);
+            // Transform vertex normal into eye coordinates
+            vec4 NN = vec4(vNormal, 0.0);
+            N = normalize((mvMatrix * NN).xyz);
+            
+            for (int i = 0; i < 2; i++) {
+                vec3 light = (lightPosition[i]).xyz;
+                L[i] = normalize(light - pos);
+                d[i] = distance(light, pos);
+            }
 
-        void main() {
-            mat4 tm = mat4( 1.0,  0.0,  0.0,  0.0,
-                0.0,  1.0,  0.0,  0.0,
-                0.0,  0.0,  1.0,  0.0,
-                tf.x, tf.y, tf.z, 1.0 );
-
-            mat4 sm = mat4( sf.x, 0.0,  0.0,  0.0,
-                0.0,  sf.y, 0.0,  0.0,
-                0.0,  0.0,  sf.z, 0.0,
-                0.0,  0.0,  0.0,  1.0 );
-
-            vec3 angles = radians( theta );
-            vec3 c = cos( angles );
-            vec3 s = sin( angles );
-
-            mat4 rx = mat4( 1.0,  0.0,  0.0, 0.0,
-                0.0,  c.x,  s.x, 0.0,
-                0.0, -s.x,  c.x, 0.0,
-                0.0,  0.0,  0.0, 1.0 );
-
-            mat4 ry = mat4( c.y, 0.0, -s.y, 0.0,
-                0.0, 1.0,  0.0, 0.0,
-                s.y, 0.0,  c.y, 0.0,
-                0.0, 0.0,  0.0, 1.0 );
-
-            mat4 rz = mat4( c.z, -s.z, 0.0, 0.0,
-                s.z,  c.z, 0.0, 0.0,
-                0.0,  0.0, 1.0, 0.0,
-                0.0,  0.0, 0.0, 1.0 );
-
-            fColor = vColor;
-            gl_Position = tm * rz * ry * rx * sm * vPosition;
+            gl_Position = prMatrix * mvMatrix * vPosition;
         }
     </script>
+
+    <!-- Fragment Shader -->
     <script id="fragment-shader" type="x-shader/x-fragment">
         precision mediump float;
-        varying vec4 fColor;
-        void main() {
+
+        uniform vec4 ambientProduct[2], diffuseProduct[2], specularProduct[2];
+        uniform float shininess;
+        varying vec3 N, L[2], E;
+        varying float d[2];
+        uniform bool calcDistance;
+
+        void main()
+        {
+            vec4 fColor = vec4(0.0, 0.0, 0.0, 1.0);
+            
+            for (int i = 0; i < 2; i++) {
+                vec3 H = normalize(L[i] + E);
+               
+                // Compute terms in the illumination equation
+                vec4 ambient = ambientProduct[i];
+                float Kd = max(dot(L[i], N), 0.0);
+                float dist;
+                if (calcDistance) {
+                    dist = 1.0 / (1.0 + 1e-4 * d[i] + 1e-9 * (d[i] * d[i]));
+                } else {
+                    dist = 1.0;
+                }
+                vec4 diffuse = Kd * diffuseProduct[i] * dist;
+                float Ks = pow(max(dot(N, H), 0.0), shininess);
+                vec4 specular = Ks * specularProduct[i] * dist;
+                if (dot(L[i], N) < 0.0) {
+                    specular = vec4(0.0, 0.0, 0.0, 1.0);
+                }
+                fColor += ambient + diffuse + specular;
+            }
+            fColor.a = 1.0;
             gl_FragColor = fColor;
         }
     </script>
@@ -70,89 +75,143 @@
     <script type="text/javascript" src="../Common/webgl-utils.js"></script>
     <script type="text/javascript" src="../Common/initShaders.js"></script>
     <script type="text/javascript" src="../Common/MV.js"></script>
-</head>
+</head>   
 
 <body>
-    <canvas id="gl-canvas" width="600" height="600"></canvas>
+
+    <canvas id="gl-canvas" width="1024" height="512">
+        Oops ... your browser doesn't support the HTML5 canvas element
+    </canvas>
+
     <br/><br/>
-    <div>
-        <strong>List of Objects:</strong>
-        <ul id="inputObjectsList"></ul>
-    </div>
-    <div id="inputPropertiesPanel">
-        <span>
-            <strong>Shape:</strong>&nbsp;
-            <select id="inputShape" onchange="setShape(value)">
-                <option value="sphere">Sphere</option>
-                <option value="cone">Cone</option>
-                <option value="cylinder">Cylinder</option>
-            </select>
-        </span>&nbsp;
-        <span>
-            <strong>Size:</strong>&nbsp;
+
+    
+    <div id="table-current-obj">
+        <div id="sel-obj-div">
+            <strong>Current shape:</strong>&nbsp;
+            <select id="sel-obj" value=""></select> &nbsp;
+            <button id="btn-del">Remove</button>
+        </div>
+        <div>
+            <strong>Scale:</strong>&nbsp;
             <span>
-                <span id="inputSizeValue">S: 5</span>
-                <input id="inputSize" type="range" name="range" min="1" max="9" value="5" onchange="setSize(value)" class="range-input">
+                X: <span id="scale-x">100</span>
+                <input id="range-scale-x" type="range" min="0" max="200" value="100">
             </span>
-        </span>
-        <br/><br/>
+            <span>
+                Y: <span id="scale-y">100</span>
+                <input id="range-scale-y" type="range" min="0" max="200" value="100">
+            </span>
+            <span>
+                Z: <span id="scale-z">100</span>
+                <input id="range-scale-z" type="range" min="0" max="200" value="100">
+            </span>
+        </div>
         <div>
             <strong>Location:</strong>&nbsp;
             <span>
-                <span id="inputLocationXValue">X: 0</span>
-                <input id="inputLocationX" type="range" name="range" min="0" max="20" value="10" onchange="setLocation('x', value)" class="range-input">
+                X: <span id="pos-x">0</span>
+                <input id="range-pos-x" type="range" min="-1000" max="1000" step="10" value="0">
             </span>&nbsp;
-            <span>
-                <span id="inputLocationYValue">Y: 0</span>
-                <input id="inputLocationY" type="range" name="range" min="0" max="20" value="10" onchange="setLocation('y', value)" class="range-input">
+                X: <span id="pos-y">0</span>
+                <input id="range-pos-y" type="range" min="-1000" max="1000" step="10" value="0">
             </span>&nbsp;
-            <span>
-                <span id="inputLocationZValue">Z: 0</span>
-                <input id="inputLocationZ" type="range" name="range" min="0" max="20" value="10" onchange="setLocation('z', value)" class="range-input">
+                X: <span id="pos-z">0</span>
+                <input id="range-pos-z" type="range" min="-1000" max="1000" step="10" value="0">
             </span>
         </div>
-        <br/>
         <div>
             <strong>Rotation:</strong>&nbsp;
             <span>
-                <span id="inputRotationXValue">X: 0</span>
-                <input id="inputRotationX" type="range" name="range" min="0" max="360" value="0" onchange="setRotation('x', value)" class="range-input">
-            </span>
-            <span>
-                <span id="inputRotationYValue">Y: 0</span>
-                <input id="inputRotationY" type="range" name="range" min="0" max="360" value="0" onchange="setRotation('y', value)" class="range-input">
-            </span>
-            <span>
-                <span id="inputRotationZValue">Z: 0</span>
-                <input id="inputRotationZ" type="range" name="range" min="0" max="360" value="0" onchange="setRotation('z', value)" class="range-input">
+                X: <span id="rotate-x">0</span>
+                <input id="range-rotate-x" type="range" min="-180" max="180" value="0">
+            </span>&nbsp;
+                X: <span id="rotate-y">0</span>
+                <input id="range-rotate-y" type="range" min="-180" max="180" value="0">
+            </span>&nbsp;
+                X: <span id="rotate-z">0</span>
+                <input id="range-rotate-z" type="range" min="-180" max="180" value="0">
             </span>
         </div>
-        <br/>
         <div>
             <strong>Colour:</strong>&nbsp;
             <span>
-                <span id="inputColourRValue">R: 0</span>
-                <input id="inputColourR" type="range" name="range" min="0" max="255" value="0" onchange="setColour('r', value)" class="range-input">
+                R: <span id="color-r">50</span>
+                <input id="range-color-r" type="range" min="0" max="255" value="50">
+            </span>&nbsp;
+                G: <span id="color-g">200</span>
+                <input id="range-color-g" type="range" min="0" max="255" value="200">
+            </span>&nbsp;
+                B: <span id="color-b">50</span>
+                <input id="range-color-b" type="range" min="0" max="255" value="50">
             </span>
-            <span>
-                <span id="inputColourGValue">G: 0</span>
-                <input id="inputColourG" type="range" name="range" min="0" max="255" value="0" onchange="setColour('g', value)" class="range-input">
-            </span>
-            <span>
-                <span id="inputColourBValue">B: 0</span>
-                <input id="inputColourB" type="range" name="range" min="0" max="255" value="0" onchange="setColour('b', value)" class="range-input">
-            </span>
-            <span class="colour-value-container">
-                <span id="inputColourValue" class="colour-value"></span>
-            </span>
-        </div>
-        <br/>
-        <div>
-            <button type="button" onclick="addNewObject()">Add New Object</button>
-            <button onclick="clearCanvas()">Clear Canvas</button>
         </div>
 
+        <div>
+            <strong>New Shape:</strong>&nbsp;
+            <select id="sel-type">
+                <option value="cube" selected>Cube</option>
+                <option value="sphere">Sphere</option>
+                <option value="cone">Cone</option>
+                <option value="cylinder">Cylinder</option>
+            </select> &nbsp;
+            <span>
+                <button id="btn-create">Add New Object</button>
+                <button id="btn-clear">Clear Canvas</button>
+            </span>
+        </div>
     </div>
-    <script type="text/javascript" src="geometriccad.js"></script>
+
+    <hr/>
+
+    <!-- Camera controls -->
+    <div id="table-camera" class="table-ctrl">
+        <div>
+            <span>
+                <strong>Projection:</strong>&nbsp;
+                <span id="td-radio-proj">
+                    <input id="radio-proj-perspective" type="radio" name="proj" value="perspective">Perspective
+                    <input id="radio-proj-ortho" type="radio" name="proj" value="ortho">Orthogonal
+                </span>
+            </span>&nbsp;&nbsp;
+            <span>
+                <strong>Lights:</strong>&nbsp;
+                <span>
+                    <input id="cb-distance" type="checkbox" checked>Distance
+                    <input id="cb-light1" type="checkbox" checked>Light 1
+                    <input id="cb-light2" type="checkbox" checked>Light 2
+                </span>
+            </span>
+        </div>
+        <div>
+            <strong>Camera:</strong>&nbsp;
+            <span>
+                X: <span id="camera-x">0</span>
+                <input id="range-camera-x" type="range" min="-1000" max="1000" value="100">
+            </span>&nbsp;
+            <span>
+                X: <span id="camera-y">0</span>
+                <input id="range-camera-y" type="range" min="-1000" max="1000" value="100">
+            </span>&nbsp;
+            <span>
+                X: <span id="camera-z">0</span>
+                <input id="range-camera-z" type="range" min="-1000" max="1000" value="100">
+            </span>
+        </div>
+        <div>
+            <strong>Lookat:</strong>&nbsp;
+            <span>
+                X: <span id="lookat-x">0</span>
+               <input id="range-lookat-x" type="range" min="-1000" max="1000" value="0">
+            </span>&nbsp;
+                X: <span id="lookat-y">0</span>
+               <input id="range-lookat-y" type="range" min="-1000" max="1000" value="500">
+            </span>&nbsp;
+                X: <span id="lookat-z">0</span>
+               <input id="range-lookat-z" type="range" min="-1000" max="1000" value="0">
+            </span>
+        </div>
+    </div>
+    <script type="text/javascript" src="lighting.js"></script>
 </body>
 </html>
